@@ -1,0 +1,395 @@
+import { useParams, Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  MapPin, 
+  Star, 
+  Calendar,
+  Users,
+  Mail,
+  Phone,
+  Edit,
+  UserPlus,
+  UserMinus,
+  Shield,
+  Award
+} from 'lucide-react';
+import { 
+  users,
+  profiles,
+  posts,
+  regularUsers,
+  moderators,
+  admins,
+  companionRequests,
+  follows,
+  getUserById,
+  getProfileByUserId,
+  getPostsByUserId,
+  getRequestsByUserId,
+  getCityById,
+  getPlaceById
+} from '@/data/mockData';
+
+// Simulated current user
+const currentUserId = 'user-1';
+
+export default function ProfilePage() {
+  const { userId } = useParams<{ userId: string }>();
+  const targetUserId = userId || currentUserId;
+  
+  const user = getUserById(targetUserId);
+  const profile = getProfileByUserId(targetUserId);
+  const userPosts = getPostsByUserId(targetUserId);
+  const userRequests = getRequestsByUserId(targetUserId);
+  
+  // Get subtype data
+  const regularUser = regularUsers.find(r => r.user_id === targetUserId);
+  const moderator = moderators.find(m => m.user_id === targetUserId);
+  const admin = admins.find(a => a.user_id === targetUserId);
+  
+  // Check follow status
+  const isFollowing = follows.some(f => f.follower_id === currentUserId && f.following_id === targetUserId);
+  const isOwnProfile = currentUserId === targetUserId;
+
+  if (!user || !profile) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">کاربر یافت نشد</p>
+      </div>
+    );
+  }
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('fa-IR', {
+      year: 'numeric',
+      month: 'long',
+    });
+  };
+
+  const getUserTypeLabel = (type: string) => {
+    switch (type) {
+      case 'regular': return { label: 'کاربر عادی', icon: Users };
+      case 'moderator': return { label: 'مدیر محتوا', icon: Shield };
+      case 'admin': return { label: 'مدیر سیستم', icon: Award };
+      default: return { label: 'کاربر', icon: Users };
+    }
+  };
+
+  const userType = getUserTypeLabel(user.user_type);
+  const UserTypeIcon = userType.icon;
+
+  return (
+    <div className="space-y-6">
+      {/* Profile Header */}
+      <Card className="overflow-hidden">
+        {/* Cover Image */}
+        <div 
+          className="h-48 bg-cover bg-center"
+          style={{ backgroundImage: `url(${profile.cover_image})` }}
+        />
+        
+        <CardContent className="relative pt-0">
+          {/* Avatar */}
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-12 sm:-mt-16">
+            <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-background">
+              <AvatarImage src={user.profile_image} />
+              <AvatarFallback className="text-3xl">{user.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+            
+            <div className="flex-1 pb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold flex items-center gap-2">
+                    {user.name}
+                    <Badge variant="outline" className="font-normal">
+                      <UserTypeIcon className="h-3 w-3 ml-1" />
+                      {userType.label}
+                    </Badge>
+                  </h1>
+                  <p className="text-muted-foreground">@{user.username}</p>
+                </div>
+                
+                <div className="flex gap-2">
+                  {isOwnProfile ? (
+                    <Button variant="outline">
+                      <Edit className="h-4 w-4 ml-2" />
+                      ویرایش پروفایل
+                    </Button>
+                  ) : (
+                    <Button variant={isFollowing ? "outline" : "default"}>
+                      {isFollowing ? (
+                        <>
+                          <UserMinus className="h-4 w-4 ml-2" />
+                          لغو دنبال کردن
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="h-4 w-4 ml-2" />
+                          دنبال کردن
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="flex gap-6 mt-4 pt-4 border-t">
+            <div className="text-center">
+              <p className="text-2xl font-bold">{profile.followers_count}</p>
+              <p className="text-sm text-muted-foreground">دنبال‌کننده</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold">{profile.following_count}</p>
+              <p className="text-sm text-muted-foreground">دنبال‌شونده</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold">{userPosts.length}</p>
+              <p className="text-sm text-muted-foreground">تجربه</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Profile Content */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Bio */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">درباره من</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{profile.bio}</p>
+            </CardContent>
+          </Card>
+
+          {/* Contact Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">اطلاعات تماس</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-3 text-sm">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <span>{user.email}</span>
+              </div>
+              {user.phone && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>{user.phone}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-3 text-sm">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span>عضویت از {formatDate(user.created_at)}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Interests */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">علاقه‌مندی‌ها</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {profile.interests.map((interest, i) => (
+                  <Badge key={i} variant="secondary">{interest}</Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Role-specific info */}
+          {regularUser && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">اطلاعات سفر</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">سطح تجربه:</p>
+                  <Badge>{regularUser.experience_level}</Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">ترجیحات سفر:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {regularUser.travel_preferences.map((pref, i) => (
+                      <Badge key={i} variant="outline">{pref}</Badge>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {moderator && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">اطلاعات مدیریت</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">مناطق تحت نظارت:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {moderator.assigned_regions.map((region, i) => (
+                      <Badge key={i} variant="outline">{region}</Badge>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">تأییدها:</p>
+                  <Badge variant="secondary">{moderator.approval_count}</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {admin && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">اطلاعات مدیر</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">سطح دسترسی:</p>
+                  <Badge>{admin.access_level}</Badge>
+                </div>
+                {admin.last_admin_action && (
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground">آخرین اقدام:</p>
+                    <span className="text-sm">{formatDate(admin.last_admin_action)}</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Main Content */}
+        <div className="lg:col-span-2">
+          <Tabs defaultValue="posts" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="posts">تجربه‌ها ({userPosts.length})</TabsTrigger>
+              <TabsTrigger value="requests">درخواست‌های همسفر ({userRequests.length})</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="posts" className="space-y-4 mt-4">
+              {userPosts.map(post => {
+                const place = post.place_id ? getPlaceById(post.place_id) : undefined;
+                const city = post.city_id ? getCityById(post.city_id) : undefined;
+                
+                return (
+                  <Card key={post.post_id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex gap-4">
+                        <Link to={`/app/posts/${post.post_id}`} className="shrink-0">
+                          <img 
+                            src={post.images[0]} 
+                            alt={post.title}
+                            className="w-24 h-20 sm:w-32 sm:h-24 object-cover rounded-lg"
+                          />
+                        </Link>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <Link to={`/app/posts/${post.post_id}`}>
+                              <h3 className="font-bold hover:text-primary transition-colors line-clamp-1">
+                                {post.title}
+                              </h3>
+                            </Link>
+                            <Badge variant={post.experience_type === 'visited' ? 'default' : 'secondary'}>
+                              {post.experience_type === 'visited' ? 'بازدید شده' : 'رویایی'}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                            <MapPin className="h-3 w-3" />
+                            {place?.name || city?.name}
+                            <span>•</span>
+                            {formatDate(post.created_at)}
+                          </div>
+                          <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
+                            {post.content}
+                          </p>
+                          <div className="flex items-center gap-4 mt-3">
+                            <span className="flex items-center gap-1 text-sm text-yellow-500">
+                              <Star className="h-4 w-4 fill-current" />
+                              {post.avg_rating.toFixed(1)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              {userPosts.length === 0 && (
+                <Card className="py-8 text-center">
+                  <CardContent>
+                    <p className="text-muted-foreground">هنوز تجربه‌ای ثبت نشده است</p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="requests" className="space-y-4 mt-4">
+              {userRequests.map(request => {
+                const city = request.destination_city_id ? getCityById(request.destination_city_id) : undefined;
+                
+                return (
+                  <Card key={request.request_id}>
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 className="font-bold flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            {city?.name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                            <Calendar className="h-3 w-3" />
+                            {formatDate(request.travel_date)}
+                          </p>
+                          <p className="text-sm mt-2">{request.description}</p>
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {request.conditions.map((condition, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">
+                                {condition}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <Badge 
+                          variant={request.status === 'active' ? 'default' : 
+                                   request.status === 'completed' ? 'secondary' : 'destructive'}
+                        >
+                          {request.status === 'active' ? 'فعال' : 
+                           request.status === 'completed' ? 'تکمیل شده' : 'لغو شده'}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              {userRequests.length === 0 && (
+                <Card className="py-8 text-center">
+                  <CardContent>
+                    <p className="text-muted-foreground">هنوز درخواستی ثبت نشده است</p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    </div>
+  );
+}
