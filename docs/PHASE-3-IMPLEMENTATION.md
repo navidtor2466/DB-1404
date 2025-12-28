@@ -8,16 +8,16 @@ This document describes the practical implementation of the **Hamsafar Mirza** (
 
 ## 2. Technology Stack
 
-| Technology | Purpose |
-|------------|---------|
-| **React 18** | Frontend framework |
-| **TypeScript** | Type-safe JavaScript |
-| **Vite** | Build tool and dev server |
-| **Tailwind CSS** | Utility-first CSS framework |
-| **Shadcn/UI** | UI component library |
-| **React Router** | Client-side routing |
-| **React Flow** | EER/ER diagram visualization |
-| **Lucide React** | Icon library |
+| Technology       | Purpose                      |
+| ---------------- | ---------------------------- |
+| **React 18**     | Frontend framework           |
+| **TypeScript**   | Type-safe JavaScript         |
+| **Vite**         | Build tool and dev server    |
+| **Tailwind CSS** | Utility-first CSS framework  |
+| **Shadcn/UI**    | UI component library         |
+| **React Router** | Client-side routing          |
+| **React Flow**   | EER/ER diagram visualization |
+| **Lucide React** | Icon library                 |
 
 ---
 
@@ -73,26 +73,26 @@ The SQL schema (`src/data/schema.sql`) implements all entities from the logical 
 
 ### 4.1 Tables Created
 
-| Table | Description | Type |
-|-------|-------------|------|
-| `users` | Main user table with discriminator | Strong Entity |
-| `regular_users` | Regular user subtype | Subtype |
-| `moderators` | Moderator subtype | Subtype |
-| `admins` | Admin subtype | Subtype |
-| `profiles` | User profiles | Weak Entity |
-| `profile_interests` | Multi-valued attribute | Junction Table |
-| `follows` | User follows relationship | M:N Junction |
-| `cities` | City information | Strong Entity |
-| `places` | Tourist places | Strong Entity |
-| `place_features` | Multi-valued attribute | Junction Table |
-| `place_images` | Multi-valued attribute | Junction Table |
-| `posts` | Travel experiences | Strong Entity |
-| `post_images` | Multi-valued attribute | Junction Table |
-| `comments` | Post comments | Weak Entity |
-| `ratings` | Post ratings | M:N Junction |
-| `companion_requests` | Travel companion requests | Strong Entity |
-| `request_conditions` | Multi-valued attribute | Junction Table |
-| `companion_matches` | Match responses | Strong Entity |
+| Table                | Description                        | Type           |
+| -------------------- | ---------------------------------- | -------------- |
+| `users`              | Main user table with discriminator | Strong Entity  |
+| `regular_users`      | Regular user subtype               | Subtype        |
+| `moderators`         | Moderator subtype                  | Subtype        |
+| `admins`             | Admin subtype                      | Subtype        |
+| `profiles`           | User profiles                      | Weak Entity    |
+| `profile_interests`  | Multi-valued attribute             | Junction Table |
+| `follows`            | User follows relationship          | M:N Junction   |
+| `cities`             | City information                   | Strong Entity  |
+| `places`             | Tourist places                     | Strong Entity  |
+| `place_features`     | Multi-valued attribute             | Junction Table |
+| `place_images`       | Multi-valued attribute             | Junction Table |
+| `posts`              | Travel experiences                 | Strong Entity  |
+| `post_images`        | Multi-valued attribute             | Junction Table |
+| `comments`           | Post comments                      | Weak Entity    |
+| `ratings`            | Post ratings                       | M:N Junction   |
+| `companion_requests` | Travel companion requests          | Strong Entity  |
+| `request_conditions` | Multi-valued attribute             | Junction Table |
+| `companion_matches`  | Match responses                    | Strong Entity  |
 
 ### 4.2 Views (Derived Attributes)
 
@@ -161,17 +161,17 @@ interface User {
 
 ## 7. Routes
 
-| Route | Component | Description |
-|-------|-----------|-------------|
-| `/` | Home | Landing page |
-| `/app` | Dashboard | Main dashboard |
-| `/app/posts` | PostsPage | Browse experiences |
-| `/app/posts/new` | NewPostPage | Create experience |
-| `/app/posts/:id` | PostDetailPage | View experience |
-| `/app/places` | PlacesPage | Browse places |
-| `/app/companions` | CompanionsPage | Find companions |
-| `/app/profile/:id` | ProfilePage | User profile |
-| `/eer-diagram` | EERDiagram | Phase 1 diagram |
+| Route              | Component      | Description        |
+| ------------------ | -------------- | ------------------ |
+| `/`                | Home           | Landing page       |
+| `/app`             | Dashboard      | Main dashboard     |
+| `/app/posts`       | PostsPage      | Browse experiences |
+| `/app/posts/new`   | NewPostPage    | Create experience  |
+| `/app/posts/:id`   | PostDetailPage | View experience    |
+| `/app/places`      | PlacesPage     | Browse places      |
+| `/app/companions`  | CompanionsPage | Find companions    |
+| `/app/profile/:id` | ProfilePage    | User profile       |
+| `/eer-diagram`     | EERDiagram     | Phase 1 diagram    |
 
 ---
 
@@ -190,18 +190,18 @@ npm run build
 
 ---
 
-## 9. Deployment Considerations
+## 9. Database Connection
+
+### Supabase Integration
+The project is connected to Supabase PostgreSQL:
+
+- **Client**: `src/lib/supabase.ts` - Supabase client initialization
+- **API Layer**: `src/lib/api.ts` - Database query functions with mock data fallback
+- **Environment**: `.env.local` contains `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
 
 ### Frontend
 - Deploy to Vercel, Netlify, or similar
-- Environment variables for API endpoints
-
-### Backend (Future)
-- Connect to Supabase for:
-  - Authentication
-  - Database (PostgreSQL)
-  - Real-time subscriptions
-  - Storage for images
+- Environment variables for Supabase credentials
 
 ---
 
@@ -209,7 +209,8 @@ npm run build
 
 ✅ Frontend React application  
 ✅ TypeScript types matching schema  
-✅ SQL schema file  
+✅ SQL schema file executed in Supabase  
+✅ Supabase client and API layer  
 ✅ Mock data for demonstration  
 ✅ Responsive UI with RTL support  
 ✅ Documentation  
@@ -218,8 +219,8 @@ npm run build
 
 ## 11. Future Enhancements
 
-1. **Backend Integration**: Connect to Supabase
-2. **Authentication**: Real user auth with JWT
+1. **Full Async Data Fetching**: Replace synchronous mock imports with async API calls
+2. **Authentication**: Real user auth with Supabase Auth
 3. **Image Upload**: Use Supabase Storage
 4. **Real-time**: Live notifications and chat
 5. **Search**: Full-text search with PostgreSQL

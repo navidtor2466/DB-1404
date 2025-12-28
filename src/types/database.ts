@@ -53,6 +53,7 @@ export interface City {
   country: string;
   latitude?: number;
   longitude?: number;
+  image?: string;
 }
 
 export interface Place {

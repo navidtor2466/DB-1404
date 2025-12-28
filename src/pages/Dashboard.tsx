@@ -3,25 +3,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  MapPin, 
-  Users, 
-  FileText, 
-  Star, 
+import {
+  MapPin,
+  Users,
+  FileText,
+  Star,
   TrendingUp,
   Calendar,
   ArrowLeft,
   Heart
 } from 'lucide-react';
-import { 
-  posts, 
-  users, 
-  places, 
-  cities, 
+import {
+  posts,
+  users,
+  places,
+  cities,
   companionRequests,
   getUserById,
   getPlaceById,
-  getCityById 
+  getCityById
 } from '@/data/mockData';
 
 export default function Dashboard() {
@@ -55,9 +55,9 @@ export default function Dashboard() {
     <div className="space-y-8">
       {/* Hero Section */}
       <section className="relative rounded-xl overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
-          style={{ 
+          style={{
             backgroundImage: 'url(https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1200&q=80)',
           }}
         />
@@ -115,12 +115,12 @@ export default function Dashboard() {
           {recentPosts.map(post => (
             <Card key={post.post_id} className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="relative h-48">
-                <img 
-                  src={post.images[0]} 
+                <img
+                  src={post.images[0]}
                   alt={post.title}
                   className="w-full h-full object-cover"
                 />
-                <Badge 
+                <Badge
                   variant={post.experience_type === 'visited' ? 'default' : 'secondary'}
                   className="absolute top-3 right-3"
                 >
@@ -229,13 +229,13 @@ export default function Dashboard() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {cities.map(city => (
-            <Link 
-              key={city.city_id} 
+            <Link
+              key={city.city_id}
               to={`/app/places?city=${city.city_id}`}
               className="group relative rounded-xl overflow-hidden aspect-square"
             >
-              <img 
-                src={`https://images.unsplash.com/photo-1564668662856-d4c59c83b7b3?w=400&q=80`}
+              <img
+                src={city.image || 'https://placehold.co/400x400?text=City'}
                 alt={city.name}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
               />
