@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,22 +18,30 @@ import {
   Shield,
   Award
 } from 'lucide-react';
-import { 
-  users,
-  profiles,
-  posts,
-  regularUsers,
-  moderators,
-  admins,
-  companionRequests,
-  follows,
-  getUserById,
+import {
+  getAdmins,
+  getCities,
+  getFollows,
+  getModerators,
+  getPlaces,
   getProfileByUserId,
   getPostsByUserId,
+  getRegularUsers,
   getRequestsByUserId,
-  getCityById,
-  getPlaceById
-} from '@/data/mockData';
+  getUserById,
+} from '@/lib/api';
+import type {
+  Admin,
+  City,
+  CompanionRequest,
+  Follow,
+  Moderator,
+  Place,
+  Post,
+  Profile,
+  RegularUser,
+  User,
+} from '@/types/database';
 
 // Simulated current user
 const currentUserId = 'user-1';
@@ -40,12 +49,79 @@ const currentUserId = 'user-1';
 export default function ProfilePage() {
   const { userId } = useParams<{ userId: string }>();
   const targetUserId = userId || currentUserId;
+
+  const [user, setUser] = useState<User | undefined>();
+  const [profile, setProfile] = useState<Profile | undefined>();
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [userRequests, setUserRequests] = useState<CompanionRequest[]>([]);
+  const [regularUsers, setRegularUsers] = useState<RegularUser[]>([]);
+  const [moderators, setModerators] = useState<Moderator[]>([]);
+  const [admins, setAdmins] = useState<Admin[]>([]);
+  const [follows, setFollows] = useState<Follow[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const [
+          userData,
+          profileData,
+          postsData,
+          requestsData,
+          regularData,
+          moderatorData,
+          adminData,
+          followData,
+          citiesData,
+          placesData,
+        ] = await Promise.all([
+          getUserById(targetUserId),
+          getProfileByUserId(targetUserId),
+          getPostsByUserId(targetUserId),
+          getRequestsByUserId(targetUserId),
+          getRegularUsers(),
+          getModerators(),
+          getAdmins(),
+          getFollows(),
+          getCities(),
+          getPlaces(),
+        ]);
+
+        if (!isMounted) return;
+        setUser(userData);
+        setProfile(profileData);
+        setUserPosts(postsData);
+        setUserRequests(requestsData);
+        setRegularUsers(regularData);
+        setModerators(moderatorData);
+        setAdmins(adminData);
+        setFollows(followData);
+        setCities(citiesData);
+        setPlaces(placesData);
+      } catch (error) {
+        console.error('Error loading profile data:', error);
+        if (isMounted) setLoadError('Unable to load profile data.');
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    setIsLoading(true);
+    setLoadError(null);
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, [targetUserId]);
   
-  const user = getUserById(targetUserId);
-  const profile = getProfileByUserId(targetUserId);
-  const userPosts = getPostsByUserId(targetUserId);
-  const userRequests = getRequestsByUserId(targetUserId);
-  
+  const citiesById = useMemo(() => new Map(cities.map((city) => [city.city_id, city])), [cities]);
+  const placesById = useMemo(() => new Map(places.map((place) => [place.place_id, place])), [places]);
+
   // Get subtype data
   const regularUser = regularUsers.find(r => r.user_id === targetUserId);
   const moderator = moderators.find(m => m.user_id === targetUserId);
@@ -54,6 +130,14 @@ export default function ProfilePage() {
   // Check follow status
   const isFollowing = follows.some(f => f.follower_id === currentUserId && f.following_id === targetUserId);
   const isOwnProfile = currentUserId === targetUserId;
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
+        Loading profile...
+      </div>
+    );
+  }
 
   if (!user || !profile) {
     return (
@@ -70,6 +154,12 @@ export default function ProfilePage() {
     });
   };
 
+  const coverImage =
+    profile.cover_image ||
+    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&q=80';
+  const fallbackPostImage =
+    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=800&q=80';
+
   const getUserTypeLabel = (type: string) => {
     switch (type) {
       case 'regular': return { label: 'کاربر عادی', icon: Users };
@@ -84,12 +174,15 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
+      {loadError && (
+        <p className="text-sm text-destructive">{loadError}</p>
+      )}
       {/* Profile Header */}
       <Card className="overflow-hidden">
         {/* Cover Image */}
         <div 
           className="h-48 bg-cover bg-center"
-          style={{ backgroundImage: `url(${profile.cover_image})` }}
+          style={{ backgroundImage: `url(${coverImage})` }}
         />
         
         <CardContent className="relative pt-0">
@@ -201,7 +294,7 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {profile.interests.map((interest, i) => (
+                {(profile.interests ?? []).map((interest, i) => (
                   <Badge key={i} variant="secondary">{interest}</Badge>
                 ))}
               </div>
@@ -222,7 +315,7 @@ export default function ProfilePage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">ترجیحات سفر:</p>
                   <div className="flex flex-wrap gap-1">
-                    {regularUser.travel_preferences.map((pref, i) => (
+                    {(regularUser.travel_preferences ?? []).map((pref, i) => (
                       <Badge key={i} variant="outline">{pref}</Badge>
                     ))}
                   </div>
@@ -240,7 +333,7 @@ export default function ProfilePage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">مناطق تحت نظارت:</p>
                   <div className="flex flex-wrap gap-1">
-                    {moderator.assigned_regions.map((region, i) => (
+                    {(moderator.assigned_regions ?? []).map((region, i) => (
                       <Badge key={i} variant="outline">{region}</Badge>
                     ))}
                   </div>
@@ -284,8 +377,8 @@ export default function ProfilePage() {
 
             <TabsContent value="posts" className="space-y-4 mt-4">
               {userPosts.map(post => {
-                const place = post.place_id ? getPlaceById(post.place_id) : undefined;
-                const city = post.city_id ? getCityById(post.city_id) : undefined;
+                const place = post.place_id ? placesById.get(post.place_id) : undefined;
+                const city = post.city_id ? citiesById.get(post.city_id) : undefined;
                 
                 return (
                   <Card key={post.post_id} className="hover:shadow-md transition-shadow">
@@ -293,7 +386,7 @@ export default function ProfilePage() {
                       <div className="flex gap-4">
                         <Link to={`/app/posts/${post.post_id}`} className="shrink-0">
                           <img 
-                            src={post.images[0]} 
+                            src={post.images[0] || fallbackPostImage} 
                             alt={post.title}
                             className="w-24 h-20 sm:w-32 sm:h-24 object-cover rounded-lg"
                           />
@@ -342,7 +435,7 @@ export default function ProfilePage() {
 
             <TabsContent value="requests" className="space-y-4 mt-4">
               {userRequests.map(request => {
-                const city = request.destination_city_id ? getCityById(request.destination_city_id) : undefined;
+                const city = request.destination_city_id ? citiesById.get(request.destination_city_id) : undefined;
                 
                 return (
                   <Card key={request.request_id}>
@@ -359,7 +452,7 @@ export default function ProfilePage() {
                           </p>
                           <p className="text-sm mt-2">{request.description}</p>
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {request.conditions.map((condition, i) => (
+                            {(request.conditions ?? []).map((condition, i) => (
                               <Badge key={i} variant="outline" className="text-xs">
                                 {condition}
                               </Badge>

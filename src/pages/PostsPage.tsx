@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,35 +22,87 @@ import {
   Calendar,
   Eye
 } from 'lucide-react';
-import { 
-  posts, 
-  cities,
-  getUserById,
-  getPlaceById,
-  getCityById,
-  getCommentsByPostId
-} from '@/data/mockData';
+import {
+  getCities,
+  getCommentsByPostIds,
+  getPlaces,
+  getPosts,
+  getUsers,
+} from '@/lib/api';
+import type { City, Comment, Place, Post, User } from '@/types/database';
 
 export default function PostsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState<string>('all');
   const [experienceType, setExperienceType] = useState<string>('all');
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [commentsByPostId, setCommentsByPostId] = useState<Record<string, Comment[]>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const [postsData, usersData, placesData, citiesData] = await Promise.all([
+          getPosts(),
+          getUsers(),
+          getPlaces(),
+          getCities(),
+        ]);
+
+        const commentsMap = await getCommentsByPostIds(postsData.map((post) => post.post_id));
+
+        if (!isMounted) return;
+        setPosts(postsData);
+        setUsers(usersData);
+        setPlaces(placesData);
+        setCities(citiesData);
+        setCommentsByPostId(commentsMap);
+      } catch (error) {
+        console.error('Error loading posts data:', error);
+        if (isMounted) setLoadError('Unable to load posts.');
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const usersById = useMemo(() => new Map(users.map((user) => [user.user_id, user])), [users]);
+  const placesById = useMemo(() => new Map(places.map((place) => [place.place_id, place])), [places]);
+  const citiesById = useMemo(() => new Map(cities.map((city) => [city.city_id, city])), [cities]);
+
+  const fallbackPostImage =
+    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&q=80';
 
   // Enrich posts with related data
-  const enrichedPosts = posts.map(post => ({
-    ...post,
-    user: getUserById(post.user_id),
-    place: post.place_id ? getPlaceById(post.place_id) : undefined,
-    city: post.city_id ? getCityById(post.city_id) : undefined,
-    comments: getCommentsByPostId(post.post_id),
-  }));
+  const enrichedPosts = useMemo(() => (
+    posts.map(post => ({
+      ...post,
+      user: usersById.get(post.user_id),
+      place: post.place_id ? placesById.get(post.place_id) : undefined,
+      city: post.city_id ? citiesById.get(post.city_id) : undefined,
+      comments: commentsByPostId[post.post_id] ?? [],
+    }))
+  ), [posts, usersById, placesById, citiesById, commentsByPostId]);
 
   // Filter posts
   const filteredPosts = enrichedPosts.filter(post => {
-    const matchesSearch = post.title.includes(searchQuery) || 
-                          post.content.includes(searchQuery) ||
-                          post.place?.name.includes(searchQuery) ||
-                          post.city?.name.includes(searchQuery);
+    const trimmedQuery = searchQuery.trim();
+    const matchesSearch = !trimmedQuery ||
+                          post.title.includes(trimmedQuery) || 
+                          post.content.includes(trimmedQuery) ||
+                          post.place?.name?.includes(trimmedQuery) ||
+                          post.city?.name?.includes(trimmedQuery);
     const matchesCity = selectedCity === 'all' || post.city_id === selectedCity;
     const matchesType = experienceType === 'all' || post.experience_type === experienceType;
     
@@ -65,8 +117,19 @@ export default function PostsPage() {
     });
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
+        Loading posts...
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {loadError && (
+        <p className="text-sm text-destructive">{loadError}</p>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -136,7 +199,7 @@ export default function PostsPage() {
                 <Link to={`/app/posts/${post.post_id}`}>
                   <div className="relative h-48 overflow-hidden">
                     <img 
-                      src={post.images[0]} 
+                      src={post.images[0] || fallbackPostImage} 
                       alt={post.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
@@ -172,7 +235,7 @@ export default function PostsPage() {
                     <Link to={`/app/profile/${post.user_id}`} className="flex items-center gap-2 hover:opacity-80">
                       <Avatar className="h-6 w-6">
                         <AvatarImage src={post.user?.profile_image} />
-                        <AvatarFallback>{post.user?.name.charAt(0)}</AvatarFallback>
+                        <AvatarFallback>{post.user?.name?.charAt(0) ?? '?'}</AvatarFallback>
                       </Avatar>
                       <span className="text-sm">{post.user?.name}</span>
                     </Link>
@@ -202,7 +265,7 @@ export default function PostsPage() {
                   <div className="flex gap-6">
                     <Link to={`/app/posts/${post.post_id}`} className="shrink-0">
                       <img 
-                        src={post.images[0]} 
+                        src={post.images[0] || fallbackPostImage} 
                         alt={post.title}
                         className="w-32 h-24 sm:w-48 sm:h-32 object-cover rounded-lg"
                       />
@@ -234,7 +297,7 @@ export default function PostsPage() {
                         <Link to={`/app/profile/${post.user_id}`} className="flex items-center gap-2">
                           <Avatar className="h-6 w-6">
                             <AvatarImage src={post.user?.profile_image} />
-                            <AvatarFallback>{post.user?.name.charAt(0)}</AvatarFallback>
+                            <AvatarFallback>{post.user?.name?.charAt(0) ?? '?'}</AvatarFallback>
                           </Avatar>
                           <span className="text-sm">{post.user?.name}</span>
                         </Link>

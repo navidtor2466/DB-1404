@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -21,11 +22,10 @@ import {
   Mountain
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { users, profiles } from '@/data/mockData';
+import { getUsers } from '@/lib/api';
+import type { User as UserType } from '@/types/database';
 
-// Simulated current user (user-1: علی احمدی)
-const currentUser = users[0];
-const currentProfile = profiles[0];
+const fallbackUserId = 'user-1';
 
 const navItems = [
   { path: '/app', label: 'خانه', icon: Home },
@@ -36,6 +36,31 @@ const navItems = [
 
 export default function Navbar() {
   const location = useLocation();
+  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUser = async () => {
+      try {
+        const users = await getUsers();
+        if (isMounted) setCurrentUser(users[0] ?? null);
+      } catch (error) {
+        console.error('Error loading current user:', error);
+      }
+    };
+
+    loadUser();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const currentUserId = currentUser?.user_id ?? fallbackUserId;
+  const currentUserName = currentUser?.name ?? '...';
+  const currentUserUsername = currentUser?.username ?? '...';
+  const currentUserImage = currentUser?.profile_image;
+  const currentUserInitial = currentUser?.name?.charAt(0) ?? '?';
 
   const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
     <div className={mobile ? 'flex flex-col gap-2' : 'hidden md:flex gap-1'}>
@@ -78,23 +103,23 @@ export default function Navbar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={currentUser.profile_image} alt={currentUser.name} />
-                  <AvatarFallback>{currentUser.name.charAt(0)}</AvatarFallback>
+                  <AvatarImage src={currentUserImage} alt={currentUserName} />
+                  <AvatarFallback>{currentUserInitial}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{currentUser.name}</p>
+                  <p className="text-sm font-medium leading-none">{currentUserName}</p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    @{currentUser.username}
+                    @{currentUserUsername}
                   </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to={`/app/profile/${currentUser.user_id}`} className="flex items-center gap-2">
+                <Link to={`/app/profile/${currentUserId}`} className="flex items-center gap-2">
                   <User className="h-4 w-4" />
                   پروفایل
                 </Link>

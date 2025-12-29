@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,34 +6,107 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { 
-  MapPin, 
-  Star, 
+import {
+  MapPin,
+  Star,
   Calendar,
   MessageCircle,
   Heart,
   Share2,
   Bookmark,
-  Map,
+  Map as MapIcon,
   ChevronRight,
   ChevronLeft,
-  Send
+  Send,
 } from 'lucide-react';
-import { 
-  posts,
-  getUserById,
-  getPlaceById,
+import {
   getCityById,
-  getCommentsByPostId
-} from '@/data/mockData';
+  getCommentsByPostId,
+  getPlaceById,
+  getPostById,
+  getUsers,
+} from '@/lib/api';
+import type { City, Comment, Place, Post, User } from '@/types/database';
 
 export default function PostDetailPage() {
   const { postId } = useParams<{ postId: string }>();
+  const currentUserId = 'user-1';
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [userRating, setUserRating] = useState<number>(0);
   const [newComment, setNewComment] = useState('');
-  
-  const post = posts.find(p => p.post_id === postId);
+  const [post, setPost] = useState<Post | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [place, setPlace] = useState<Place | undefined>();
+  const [city, setCity] = useState<City | undefined>();
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrentImageIndex(0);
+    setUserRating(0);
+    setNewComment('');
+  }, [postId]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        if (!postId) {
+          if (isMounted) setPost(null);
+          return;
+        }
+
+        const postData = await getPostById(postId);
+        if (!postData) {
+          if (isMounted) setPost(null);
+          return;
+        }
+
+        const [usersData, commentsData, placeData, cityData] = await Promise.all([
+          getUsers(),
+          getCommentsByPostId(postData.post_id),
+          postData.place_id ? getPlaceById(postData.place_id) : Promise.resolve(undefined),
+          postData.city_id ? getCityById(postData.city_id) : Promise.resolve(undefined),
+        ]);
+
+        if (!isMounted) return;
+        setPost(postData);
+        setUsers(usersData);
+        setComments(commentsData);
+        setPlace(placeData);
+        setCity(cityData);
+      } catch (error) {
+        console.error('Error loading post data:', error);
+        if (isMounted) setLoadError('Unable to load post.');
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    setIsLoading(true);
+    setLoadError(null);
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, [postId]);
+
+  const usersById = useMemo(() => new Map(users.map((user) => [user.user_id, user])), [users]);
+  const user = post ? usersById.get(post.user_id) : undefined;
+  const currentUser = usersById.get(currentUserId);
+  const fallbackPostImage =
+    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&q=80';
+  const postImages = post?.images?.length ? post.images : [fallbackPostImage];
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
+        Loading post...
+      </div>
+    );
+  }
   
   if (!post) {
     return (
@@ -46,11 +119,6 @@ export default function PostDetailPage() {
     );
   }
 
-  const user = getUserById(post.user_id);
-  const place = post.place_id ? getPlaceById(post.place_id) : undefined;
-  const city = post.city_id ? getCityById(post.city_id) : undefined;
-  const comments = getCommentsByPostId(post.post_id);
-
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('fa-IR', {
       year: 'numeric',
@@ -60,11 +128,11 @@ export default function PostDetailPage() {
   };
 
   const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % post.images.length);
+    setCurrentImageIndex((prev) => (prev + 1) % postImages.length);
   };
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + post.images.length) % post.images.length);
+    setCurrentImageIndex((prev) => (prev - 1 + postImages.length) % postImages.length);
   };
 
   return (
@@ -76,6 +144,10 @@ export default function PostDetailPage() {
         <span>{post.title}</span>
       </nav>
 
+      {loadError && (
+        <p className="text-sm text-destructive">{loadError}</p>
+      )}
+
       {/* Main Content */}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Post Content */}
@@ -84,12 +156,12 @@ export default function PostDetailPage() {
           <Card className="overflow-hidden">
             <div className="relative">
               <img 
-                src={post.images[currentImageIndex]} 
+                src={postImages[currentImageIndex]} 
                 alt={post.title}
                 className="w-full h-80 sm:h-96 object-cover"
               />
               
-              {post.images.length > 1 && (
+              {postImages.length > 1 && (
                 <>
                   <Button 
                     variant="ghost" 
@@ -110,7 +182,7 @@ export default function PostDetailPage() {
                   
                   {/* Image indicators */}
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                    {post.images.map((_, index) => (
+                    {postImages.map((_, index) => (
                       <button
                         key={index}
                         className={`w-2 h-2 rounded-full transition-colors ${
@@ -132,9 +204,9 @@ export default function PostDetailPage() {
             </div>
 
             {/* Thumbnail Strip */}
-            {post.images.length > 1 && (
+            {postImages.length > 1 && (
               <div className="p-2 flex gap-2 overflow-x-auto">
-                {post.images.map((img, index) => (
+                {postImages.map((img, index) => (
                   <button
                     key={index}
                     className={`shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${
@@ -232,8 +304,8 @@ export default function PostDetailPage() {
               {/* Add Comment */}
               <div className="flex gap-4">
                 <Avatar className="h-10 w-10 shrink-0">
-                  <AvatarImage src={getUserById('user-1')?.profile_image} />
-                  <AvatarFallback>ع</AvatarFallback>
+                  <AvatarImage src={currentUser?.profile_image} />
+                  <AvatarFallback>{currentUser?.name?.charAt(0) ?? '?'}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 space-y-2">
                   <Textarea 
@@ -253,13 +325,13 @@ export default function PostDetailPage() {
 
               {/* Comments List */}
               {comments.map((comment) => {
-                const commentUser = getUserById(comment.user_id);
+                const commentUser = usersById.get(comment.user_id);
                 return (
                   <div key={comment.comment_id} className="flex gap-4">
                     <Link to={`/app/profile/${comment.user_id}`}>
                       <Avatar className="h-10 w-10 shrink-0">
                         <AvatarImage src={commentUser?.profile_image} />
-                        <AvatarFallback>{commentUser?.name.charAt(0)}</AvatarFallback>
+                        <AvatarFallback>{commentUser?.name?.charAt(0) ?? '?'}</AvatarFallback>
                       </Avatar>
                     </Link>
                     <div className="flex-1">
@@ -303,7 +375,7 @@ export default function PostDetailPage() {
               >
                 <Avatar className="h-14 w-14">
                   <AvatarImage src={user?.profile_image} />
-                  <AvatarFallback>{user?.name.charAt(0)}</AvatarFallback>
+                  <AvatarFallback>{user?.name?.charAt(0) ?? '?'}</AvatarFallback>
                 </Avatar>
                 <div>
                   <h4 className="font-medium">{user?.name}</h4>
@@ -373,7 +445,7 @@ export default function PostDetailPage() {
                 {place?.map_url && (
                   <Button asChild variant="outline" className="w-full">
                     <a href={place.map_url} target="_blank" rel="noopener noreferrer">
-                      <Map className="h-4 w-4 ml-2" />
+                      <MapIcon className="h-4 w-4 ml-2" />
                       نمایش در نقشه
                     </a>
                   </Button>

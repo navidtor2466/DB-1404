@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
+    "dev:mock": "node scripts/dev.mjs --mode mock",
+    "dev:supabase": "node scripts/dev.mjs --mode supabase",
+    "seed:supabase": "tsx scripts/seed-supabase.ts",
     "build": "tsc ; vite build",
     "build-no-errors": "tsc ; vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
@@ -69,6 +72,7 @@
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "tailwindcss": "3.4.1",
+    "tsx": "^4.19.2",
     "typescript": "^5.8.2",
     "vite": "^7.1.12"
   }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,8 +21,8 @@ import {
   Eye,
   ArrowRight
 } from 'lucide-react';
-import { cities, places, getCityById } from '@/data/mockData';
-import { ExperienceType } from '@/types/database';
+import { getCities, getPlaces } from '@/lib/api';
+import type { ExperienceType, City, Place } from '@/types/database';
 
 export default function NewPostPage() {
   const navigate = useNavigate();
@@ -33,6 +33,37 @@ export default function NewPostPage() {
   const [selectedPlace, setSelectedPlace] = useState<string>('');
   const [images, setImages] = useState<string[]>([]);
   const [newImageUrl, setNewImageUrl] = useState('');
+  const [cities, setCities] = useState<City[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const [citiesData, placesData] = await Promise.all([
+          getCities(),
+          getPlaces(),
+        ]);
+
+        if (!isMounted) return;
+        setCities(citiesData);
+        setPlaces(placesData);
+      } catch (error) {
+        console.error('Error loading location data:', error);
+        if (isMounted) setLoadError('Unable to load cities and places.');
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Filter places by selected city
   const filteredPlaces = selectedCity 
@@ -59,8 +90,19 @@ export default function NewPostPage() {
 
   const isFormValid = title && content && selectedCity && images.length > 0;
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
+        Loading form...
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      {loadError && (
+        <p className="text-sm text-destructive">{loadError}</p>
+      )}
       {/* Breadcrumb */}
       <nav className="text-sm text-muted-foreground">
         <Link to="/app/posts" className="hover:text-primary">تجربه‌ها</Link>

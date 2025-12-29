@@ -1,5 +1,5 @@
 // Mock Data for Hamsafar Mirza - Based on Phase 2 Logical Design
-import {
+import type {
   User,
   Profile,
   City,
@@ -13,7 +13,7 @@ import {
   RegularUser,
   Moderator,
   Admin,
-} from '@/types/database';
+} from '../types/database';
 
 // ==================== USERS ====================
 export const users: User[] = [

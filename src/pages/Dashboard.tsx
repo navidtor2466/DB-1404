@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,17 +15,73 @@ import {
   Heart
 } from 'lucide-react';
 import {
-  posts,
-  users,
-  places,
-  cities,
-  companionRequests,
-  getUserById,
-  getPlaceById,
-  getCityById
-} from '@/data/mockData';
+  getCompanionRequests,
+  getCities,
+  getPlaces,
+  getPosts,
+  getUsers,
+} from '@/lib/api';
+import type { City, CompanionRequest, Place, Post, User } from '@/types/database';
 
 export default function Dashboard() {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [companionRequests, setCompanionRequests] = useState<CompanionRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const [postsData, usersData, placesData, citiesData, requestsData] = await Promise.all([
+          getPosts(),
+          getUsers(),
+          getPlaces(),
+          getCities(),
+          getCompanionRequests(),
+        ]);
+
+        if (!isMounted) return;
+        setPosts(postsData);
+        setUsers(usersData);
+        setPlaces(placesData);
+        setCities(citiesData);
+        setCompanionRequests(requestsData);
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        if (isMounted) setLoadError('Unable to load dashboard data.');
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const getUserById = (userId: string) => users.find((user) => user.user_id === userId);
+  const getPlaceById = (placeId: string) => places.find((place) => place.place_id === placeId);
+  const getCityById = (cityId: string) => cities.find((city) => city.city_id === cityId);
+  const fallbackPostImage =
+    'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1200&q=80';
+  const isPlaceholderCityImage = (image?: string) =>
+    !!image?.trim() && !image.includes('placehold.co');
+  const featuredCities = cities.filter((city) => isPlaceholderCityImage(city.image));
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
+        Loading dashboard...
+      </div>
+    );
+  }
+
   // Get recent posts (last 3)
   const recentPosts = posts.slice(0, 3).map(post => ({
     ...post,
@@ -53,6 +110,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {loadError && (
+        <p className="text-sm text-destructive">{loadError}</p>
+      )}
       {/* Hero Section */}
       <section className="relative rounded-xl overflow-hidden">
         <div
@@ -116,7 +176,7 @@ export default function Dashboard() {
             <Card key={post.post_id} className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="relative h-48">
                 <img
-                  src={post.images[0]}
+                  src={post.images[0] || fallbackPostImage}
                   alt={post.title}
                   className="w-full h-full object-cover"
                 />
@@ -142,7 +202,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2">
                     <Avatar className="h-6 w-6">
                       <AvatarImage src={post.user?.profile_image} />
-                      <AvatarFallback>{post.user?.name.charAt(0)}</AvatarFallback>
+                      <AvatarFallback>{post.user?.name?.charAt(0) ?? '?'}</AvatarFallback>
                     </Avatar>
                     <span className="text-sm">{post.user?.name}</span>
                   </div>
@@ -175,7 +235,7 @@ export default function Dashboard() {
                 <div className="flex items-center gap-3 mb-2">
                   <Avatar>
                     <AvatarImage src={request.user?.profile_image} />
-                    <AvatarFallback>{request.user?.name.charAt(0)}</AvatarFallback>
+                    <AvatarFallback>{request.user?.name?.charAt(0) ?? '?'}</AvatarFallback>
                   </Avatar>
                   <div>
                     <CardTitle className="text-base">{request.user?.name}</CardTitle>
@@ -228,14 +288,14 @@ export default function Dashboard() {
           </Button>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {cities.map(city => (
+          {featuredCities.map(city => (
             <Link
               key={city.city_id}
               to={`/app/places?city=${city.city_id}`}
               className="group relative rounded-xl overflow-hidden aspect-square"
             >
               <img
-                src={city.image || 'https://placehold.co/400x400?text=City'}
+                src={city.image}
                 alt={city.name}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
               />

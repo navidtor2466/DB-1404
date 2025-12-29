@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,16 +36,14 @@ import {
   Users,
   MessageCircle
 } from 'lucide-react';
-import { 
-  companionRequests,
-  companionMatches,
-  cities,
-  getUserById,
-  getPlaceById,
-  getCityById,
-  getMatchesByRequestId,
-  users
-} from '@/data/mockData';
+import {
+  getCities,
+  getCompanionMatches,
+  getCompanionRequests,
+  getPlaces,
+  getUsers,
+} from '@/lib/api';
+import type { City, CompanionMatch, CompanionRequest, Place, User } from '@/types/database';
 
 // Simulated current user
 const currentUserId = 'user-1';
@@ -54,25 +52,81 @@ export default function CompanionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('active');
-  const [newRequestMessage, setNewRequestMessage] = useState('');
+  const [matchMessages, setMatchMessages] = useState<Record<string, string>>({});
+  const [companionRequests, setCompanionRequests] = useState<CompanionRequest[]>([]);
+  const [companionMatches, setCompanionMatches] = useState<CompanionMatch[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const usersById = useMemo(() => new Map(users.map((user) => [user.user_id, user])), [users]);
+  const placesById = useMemo(() => new Map(places.map((place) => [place.place_id, place])), [places]);
+  const citiesById = useMemo(() => new Map(cities.map((city) => [city.city_id, city])), [cities]);
+  const matchesByRequestId = useMemo(() => {
+    const grouped: Record<string, CompanionMatch[]> = {};
+    companionMatches.forEach((match) => {
+      if (!grouped[match.request_id]) grouped[match.request_id] = [];
+      grouped[match.request_id].push(match);
+    });
+    return grouped;
+  }, [companionMatches]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const [requestsData, matchesData, citiesData, placesData, usersData] = await Promise.all([
+          getCompanionRequests(),
+          getCompanionMatches(),
+          getCities(),
+          getPlaces(),
+          getUsers(),
+        ]);
+
+        if (!isMounted) return;
+        setCompanionRequests(requestsData);
+        setCompanionMatches(matchesData);
+        setCities(citiesData);
+        setPlaces(placesData);
+        setUsers(usersData);
+      } catch (error) {
+        console.error('Error loading companions data:', error);
+        if (isMounted) setLoadError('Unable to load companion requests.');
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Enrich requests with related data
-  const enrichedRequests = companionRequests.map(request => ({
-    ...request,
-    user: getUserById(request.user_id),
-    place: request.destination_place_id ? getPlaceById(request.destination_place_id) : undefined,
-    city: request.destination_city_id ? getCityById(request.destination_city_id) : undefined,
-    matches: getMatchesByRequestId(request.request_id).map(match => ({
-      ...match,
-      companion_user: getUserById(match.companion_user_id),
-    })),
-  }));
+  const enrichedRequests = useMemo(() => (
+    companionRequests.map(request => ({
+      ...request,
+      user: usersById.get(request.user_id),
+      place: request.destination_place_id ? placesById.get(request.destination_place_id) : undefined,
+      city: request.destination_city_id ? citiesById.get(request.destination_city_id) : undefined,
+      matches: (matchesByRequestId[request.request_id] ?? []).map(match => ({
+        ...match,
+        companion_user: usersById.get(match.companion_user_id),
+      })),
+    }))
+  ), [companionRequests, usersById, placesById, citiesById, matchesByRequestId]);
 
   // Filter requests
   const filteredRequests = enrichedRequests.filter(request => {
-    const matchesSearch = request.description?.includes(searchQuery) ||
-                          request.user?.name.includes(searchQuery) ||
-                          request.city?.name.includes(searchQuery);
+    const trimmedQuery = searchQuery.trim();
+    const matchesSearch = !trimmedQuery ||
+                          request.description?.includes(trimmedQuery) ||
+                          request.user?.name?.includes(trimmedQuery) ||
+                          request.city?.name?.includes(trimmedQuery);
     const matchesCity = selectedCity === 'all' || request.destination_city_id === selectedCity;
     const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
     
@@ -117,8 +171,19 @@ export default function CompanionsPage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
+        Loading companions...
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {loadError && (
+        <p className="text-sm text-destructive">{loadError}</p>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -238,7 +303,7 @@ export default function CompanionsPage() {
                     <Link to={`/app/profile/${request.user_id}`} className="flex items-center gap-3">
                       <Avatar>
                         <AvatarImage src={request.user?.profile_image} />
-                        <AvatarFallback>{request.user?.name.charAt(0)}</AvatarFallback>
+                        <AvatarFallback>{request.user?.name?.charAt(0) ?? '?'}</AvatarFallback>
                       </Avatar>
                       <div>
                         <CardTitle className="text-base">{request.user?.name}</CardTitle>
@@ -264,7 +329,7 @@ export default function CompanionsPage() {
                     
                     {/* Conditions */}
                     <div className="flex flex-wrap gap-1">
-                      {request.conditions.map((condition, i) => (
+                      {(request.conditions ?? []).map((condition, i) => (
                         <Badge key={i} variant="outline" className="text-xs">
                           {condition}
                         </Badge>
@@ -299,8 +364,13 @@ export default function CompanionsPage() {
                             <Textarea 
                               placeholder="معرفی خود و دلیل علاقه به این سفر..."
                               rows={4}
-                              value={newRequestMessage}
-                              onChange={(e) => setNewRequestMessage(e.target.value)}
+                              value={matchMessages[request.request_id] ?? ''}
+                              onChange={(e) =>
+                                setMatchMessages((prev) => ({
+                                  ...prev,
+                                  [request.request_id]: e.target.value,
+                                }))
+                              }
                             />
                           </div>
                           <DialogFooter>
@@ -359,7 +429,7 @@ export default function CompanionsPage() {
                         <div className="flex items-center gap-3">
                           <Avatar>
                             <AvatarImage src={match.companion_user?.profile_image} />
-                            <AvatarFallback>{match.companion_user?.name.charAt(0)}</AvatarFallback>
+                            <AvatarFallback>{match.companion_user?.name?.charAt(0) ?? '?'}</AvatarFallback>
                           </Avatar>
                           <div>
                             <p className="font-medium">{match.companion_user?.name}</p>
@@ -411,7 +481,7 @@ export default function CompanionsPage() {
                   <div className="flex items-center gap-4">
                     <Avatar className="h-12 w-12">
                       <AvatarImage src={match.request?.user?.profile_image} />
-                      <AvatarFallback>{match.request?.user?.name.charAt(0)}</AvatarFallback>
+                      <AvatarFallback>{match.request?.user?.name?.charAt(0) ?? '?'}</AvatarFallback>
                     </Avatar>
                     <div>
                       <h4 className="font-medium">{match.request?.user?.name}</h4>

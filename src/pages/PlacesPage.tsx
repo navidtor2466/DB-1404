@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,39 +11,99 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { 
-  MapPin, 
+import {
+  MapPin,
   Search,
-  Map,
+  Map as MapIcon,
   ExternalLink,
   Building2,
-  ImageIcon
+  ImageIcon,
 } from 'lucide-react';
-import { places, cities, getCityById, posts } from '@/data/mockData';
+import { getCities, getPlaces, getPosts } from '@/lib/api';
+import type { City, Place, Post } from '@/types/database';
 
 export default function PlacesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState<string>('all');
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        const [placesData, citiesData, postsData] = await Promise.all([
+          getPlaces(),
+          getCities(),
+          getPosts(),
+        ]);
+
+        if (!isMounted) return;
+        setPlaces(placesData);
+        setCities(citiesData);
+        setPosts(postsData);
+      } catch (error) {
+        console.error('Error loading places data:', error);
+        if (isMounted) setLoadError('Unable to load places.');
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const citiesById = useMemo(() => new Map(cities.map((city) => [city.city_id, city])), [cities]);
+  const postCountsByPlace = useMemo(() => {
+    const counts: Record<string, number> = {};
+    posts.forEach((post) => {
+      if (!post.place_id) return;
+      counts[post.place_id] = (counts[post.place_id] ?? 0) + 1;
+    });
+    return counts;
+  }, [posts]);
 
   // Enrich places with city data and post count
-  const enrichedPlaces = places.map(place => ({
-    ...place,
-    city: getCityById(place.city_id),
-    postCount: posts.filter(p => p.place_id === place.place_id).length,
-  }));
+  const enrichedPlaces = useMemo(() => (
+    places.map(place => ({
+      ...place,
+      city: citiesById.get(place.city_id),
+      postCount: postCountsByPlace[place.place_id] ?? 0,
+    }))
+  ), [places, citiesById, postCountsByPlace]);
 
   // Filter places
   const filteredPlaces = enrichedPlaces.filter(place => {
-    const matchesSearch = place.name.includes(searchQuery) || 
-                          place.description?.includes(searchQuery) ||
-                          place.city?.name.includes(searchQuery);
+    const trimmedQuery = searchQuery.trim();
+    const matchesSearch = !trimmedQuery ||
+                          place.name.includes(trimmedQuery) || 
+                          place.description?.includes(trimmedQuery) ||
+                          place.city?.name?.includes(trimmedQuery);
     const matchesCity = selectedCity === 'all' || place.city_id === selectedCity;
     
     return matchesSearch && matchesCity;
   });
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
+        Loading places...
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {loadError && (
+        <p className="text-sm text-destructive">{loadError}</p>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -113,7 +173,7 @@ export default function PlacesPage() {
       {/* Places Grid */}
       <section>
         <h2 className="text-xl font-bold mb-4">
-          مکان‌ها {selectedCity !== 'all' && `در ${getCityById(selectedCity)?.name}`}
+          مکان‌ها {selectedCity !== 'all' && `در ${citiesById.get(selectedCity)?.name}`}
         </h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredPlaces.map(place => (
@@ -170,7 +230,7 @@ export default function PlacesPage() {
                     {place.map_url && (
                       <Button size="sm" variant="outline" asChild>
                         <a href={place.map_url} target="_blank" rel="noopener noreferrer">
-                          <Map className="h-4 w-4 ml-1" />
+                          <MapIcon className="h-4 w-4 ml-1" />
                           نقشه
                         </a>
                       </Button>
