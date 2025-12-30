@@ -80,6 +80,15 @@ The transformation followed standard algorithm steps:
     *   `score`: CHECK (1 <= score <= 5)
     *   `status`: CHECK IN ('active', 'completed', 'cancelled')
     *   `experience_type`: CHECK IN ('visited', 'imagined')
+    *   `approval_status`: CHECK IN ('pending', 'approved', 'rejected')
+    *   `experience_level`: CHECK IN ('beginner', 'intermediate', 'advanced', 'expert')
+
+---
+
+## 6. Implementation Alignment Notes (Phase 3)
+
+- Optional location references in `posts` and `companion_requests` use `ON DELETE SET NULL` in `src/data/schema.sql`.
+- The UI expects an optional `cities.image` for featured cards; if you want it persisted, add an `image` column (or a media table) and the seed script will populate it when present.
 
 ---
 

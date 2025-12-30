@@ -17,6 +17,7 @@ This document describes the practical implementation of the **Hamsafar Mirza** (
 | **Shadcn/UI**    | UI component library         |
 | **React Router** | Client-side routing          |
 | **React Flow**   | EER/ER diagram visualization |
+| **Supabase JS**  | Postgres client + auth APIs  |
 | **Lucide React** | Icon library                 |
 
 ---
@@ -25,44 +26,43 @@ This document describes the practical implementation of the **Hamsafar Mirza** (
 
 ```
 src/
-├── App.tsx                     # Main app with routing
-├── main.tsx                    # Entry point
-├── index.css                   # Global styles
-│
-├── components/
-│   ├── layout/
-│   │   ├── AppLayout.tsx       # Main app layout with header/footer
-│   │   └── Navbar.tsx          # Navigation bar
-│   │
-│   ├── ui/                     # Shadcn/UI components
-│   │   ├── button.tsx
-│   │   ├── card.tsx
-│   │   ├── dialog.tsx
-│   │   └── ...
-│   │
-│   ├── home.tsx                # Landing page
-│   ├── EERDiagram.tsx          # Phase 1 visualization
-│   └── ERDiagram.tsx           # ER diagram visualization
-│
-├── pages/
-│   ├── Dashboard.tsx           # Main dashboard
-│   ├── PostsPage.tsx           # Posts listing
-│   ├── PostDetailPage.tsx      # Single post view
-│   ├── NewPostPage.tsx         # Create new post
-│   ├── PlacesPage.tsx          # Places/cities browser
-│   ├── CompanionsPage.tsx      # Companion finder
-│   └── ProfilePage.tsx         # User profiles
-│
-├── types/
-│   ├── database.ts             # TypeScript types matching schema
-│   └── supabase.ts             # Supabase types (when connected)
-│
-├── data/
-│   ├── mockData.ts             # Mock data for demo
-│   └── schema.sql              # Complete SQL schema
-│
-└── lib/
-    └── utils.ts                # Utility functions
+|-- App.tsx                     # Main app with routing
+|-- main.tsx                    # Entry point
+|-- index.css                   # Global styles
+|-- components/
+|   |-- layout/
+|   |   |-- AppLayout.tsx       # Main app layout with header/footer
+|   |   `-- Navbar.tsx          # Navigation bar
+|   |-- ui/                     # Shadcn/UI components
+|   |   |-- button.tsx
+|   |   |-- card.tsx
+|   |   |-- dialog.tsx
+|   |   `-- ...
+|   |-- home.tsx                # Legacy landing page (not routed)
+|   |-- EERDiagram.tsx          # Phase 1 visualization
+|   `-- ERDiagram.tsx           # ER diagram visualization
+|-- pages/
+|   |-- Dashboard.tsx           # Main dashboard
+|   |-- PostsPage.tsx           # Posts listing
+|   |-- PostDetailPage.tsx      # Single post view
+|   |-- NewPostPage.tsx         # Create new post
+|   |-- PlacesPage.tsx          # Places/cities browser
+|   |-- CompanionsPage.tsx      # Companion finder
+|   `-- ProfilePage.tsx         # User profiles
+|-- types/
+|   |-- database.ts             # TypeScript types matching schema
+|   `-- supabase.ts             # Supabase types (when connected)
+|-- data/
+|   |-- mockData.ts             # Mock data for demo
+|   `-- schema.sql              # Complete SQL schema
+`-- lib/
+    |-- api.ts                  # Supabase + mock data adapter
+    |-- supabase.ts             # Supabase client + data source mode
+    `-- utils.ts                # Utility functions
+
+scripts/
+|-- dev.mjs                     # Dev helper (sets VITE_DATA_SOURCE)
+`-- seed-supabase.ts            # Seed Supabase with mock data
 ```
 
 ---
@@ -134,8 +134,8 @@ interface User {
 ## 6. Application Features
 
 ### 6.1 User Management
-- User registration and login (mock)
-- Profile management
+- No real auth UI yet; the navbar uses the first user in the dataset
+- Profile viewing/editing (mock data)
 - Role-based access (Regular, Moderator, Admin)
 - Follow/unfollow system
 
@@ -161,17 +161,20 @@ interface User {
 
 ## 7. Routes
 
-| Route              | Component      | Description        |
-| ------------------ | -------------- | ------------------ |
-| `/`                | Home           | Landing page       |
-| `/app`             | Dashboard      | Main dashboard     |
-| `/app/posts`       | PostsPage      | Browse experiences |
-| `/app/posts/new`   | NewPostPage    | Create experience  |
-| `/app/posts/:id`   | PostDetailPage | View experience    |
-| `/app/places`      | PlacesPage     | Browse places      |
-| `/app/companions`  | CompanionsPage | Find companions    |
-| `/app/profile/:id` | ProfilePage    | User profile       |
-| `/eer-diagram`     | EERDiagram     | Phase 1 diagram    |
+| Route                        | Component      | Description                 |
+| ---------------------------- | -------------- | --------------------------- |
+| `/`                          | -              | Redirects to `/app`         |
+| `/app`                       | Dashboard      | Main dashboard              |
+| `/app/posts`                 | PostsPage      | Browse experiences          |
+| `/app/posts/new`             | NewPostPage    | Create experience           |
+| `/app/posts/:postId`         | PostDetailPage | View experience             |
+| `/app/places`                | PlacesPage     | Browse places               |
+| `/app/companions`            | CompanionsPage | Find companions             |
+| `/app/companions/:requestId` | CompanionsPage | Companion request detail    |
+| `/app/profile/:userId`       | ProfilePage    | User profile                |
+| `/app/settings`              | ProfilePage    | Settings (profile view)     |
+| `/eer-diagram`               | EERDiagram     | EER diagram                 |
+| `/er-diagram`                | ERDiagram      | ER diagram                  |
 
 ---
 
@@ -184,6 +187,15 @@ npm install
 # Start development server
 npm run dev
 
+# Start with mock data only
+npm run dev:mock
+
+# Start with Supabase only
+npm run dev:supabase
+
+# Seed Supabase with mock data
+npm run seed:supabase
+
 # Build for production
 npm run build
 ```
@@ -192,12 +204,23 @@ npm run build
 
 ## 9. Database Connection
 
-### Supabase Integration
-The project is connected to Supabase PostgreSQL:
+### Supabase + Mock Data Modes
+The data layer can run in three modes:
 
-- **Client**: `src/lib/supabase.ts` - Supabase client initialization
-- **API Layer**: `src/lib/api.ts` - Database query functions with mock data fallback
-- **Environment**: `.env.local` contains `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+- **mock**: Always use `src/data/mockData.ts`
+- **supabase**: Require Supabase credentials; errors if missing
+- **auto**: Default; use Supabase if configured, otherwise fallback to mock data
+
+Key files:
+- **Client**: `src/lib/supabase.ts` (reads `VITE_DATA_SOURCE` or Vite `MODE`)
+- **API Layer**: `src/lib/api.ts` (runtime switch + fallback logic)
+- **Seeder**: `scripts/seed-supabase.ts` (loads mock data into Supabase)
+
+Environment:
+- `.env.local` uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+- `VITE_DATA_SOURCE` can be set to `mock`, `supabase`, or `auto`
+
+Note: The mock dataset includes `cities.image`. The seed script will insert it if the column exists; otherwise it skips the column and logs a warning.
 
 ### Frontend
 - Deploy to Vercel, Netlify, or similar
@@ -207,13 +230,14 @@ The project is connected to Supabase PostgreSQL:
 
 ## 10. Phase 3 Deliverables
 
-✅ Frontend React application  
-✅ TypeScript types matching schema  
-✅ SQL schema file executed in Supabase  
-✅ Supabase client and API layer  
-✅ Mock data for demonstration  
-✅ Responsive UI with RTL support  
-✅ Documentation  
+? Frontend React application  
+? TypeScript types matching schema  
+? SQL schema file for Supabase  
+? Supabase client with mock fallback  
+? Seed script for Supabase  
+? Mock data for demonstration  
+? Responsive UI with RTL support  
+? Documentation  
 
 ---
 

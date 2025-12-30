@@ -21,12 +21,13 @@ This document provides a comprehensive explanation of the Enhanced Entity-Relati
 
 ### System Overview
 - **Purpose**: A travel companion platform for sharing experiences and finding travel partners
-- **Language Support**: Persian (Farsi) and English
+- **Primary UI Language**: Persian (RTL) with some English labels (diagrams)
 - **Key Features**:
   - User management with role-based access
   - Travel experience sharing (posts)
   - Location management (places & cities)
   - Companion finding and matching
+  - Social signals (follows and ratings)
 
 ---
 
@@ -625,9 +626,9 @@ USERS ══════ TOTAL ══════ PROFILE
 USERS ────── Partial ────── POSTS
  │ Users CAN write posts, but it's optional
  
-POSTS ══════ TOTAL ══════ COMMENTS
- │ Comments MUST belong to a post
- │ (Weak entity - cannot exist independently)
+POSTS ══════ Partial ══════ COMMENTS
+ │ Posts MAY have zero comments
+ │ Comments MUST belong to a post (weak entity)
 ```
 
 ---
@@ -677,6 +678,8 @@ POSTS ══════ TOTAL ══════ COMMENTS
 ---
 
 ## SQL Schema Example
+
+Note: The authoritative implementation lives in `src/data/schema.sql` (includes triggers/indexes and uses `uuid_generate_v4()` with `ON DELETE SET NULL` for optional location references).
 
 ### Complete Database Schema
 
@@ -912,4 +915,4 @@ GROUP BY p.post_id;
 ---
 
 *Documentation generated for همسفر میرزا (Hamsafar Mirza) EER Diagram*
-*Last Updated: 2024*
+*Last Updated: 2025*

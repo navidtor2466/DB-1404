@@ -17,6 +17,7 @@
 - 🗺️ Discover tourist attractions across Iranian cities
 - 👥 Find travel companions for upcoming trips
 - ⭐ Rate and comment on experiences
+- 👤 Follow other travelers and manage profiles
 
 ---
 
@@ -35,8 +36,17 @@ cd path\to\DB-1404
 # Install dependencies
 npm install
 
-# Run development server
+# Run development server (auto mode)
 npm run dev
+
+# Force mock data
+npm run dev:mock
+
+# Force Supabase (requires env)
+npm run dev:supabase
+
+# Seed Supabase with mock data (optional)
+npm run seed:supabase
 ```
 
 ### Linux / macOS
@@ -48,12 +58,21 @@ cd path/to/DB-1404
 # Install dependencies
 npm install
 
-# Run development server
+# Run development server (auto mode)
 npm run dev
+
+# Force mock data
+npm run dev:mock
+
+# Force Supabase (requires env)
+npm run dev:supabase
+
+# Seed Supabase with mock data (optional)
+npm run seed:supabase
 ```
 
 ### Access the App
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open [http://localhost:5173](http://localhost:5173) in your browser. The root URL redirects to `/app`.
 
 ### Build for Production
 ```bash
@@ -62,6 +81,7 @@ npm run build
 
 ---
 
+
 ## ⚙️ Environment Setup (Database Connection)
 
 To connect to Supabase database, create a `.env.local` file in the project root:
@@ -69,43 +89,61 @@ To connect to Supabase database, create a `.env.local` file in the project root:
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Optional data mode: mock | supabase | auto (default)
+VITE_DATA_SOURCE=auto
 ```
 
-> **Note**: Without these credentials, the app will use demo data from `mockData.ts`.
+Data modes:
+- `auto`: Use Supabase when configured, otherwise fallback to mock data
+- `supabase`: Require Supabase credentials (no mock fallback)
+- `mock`: Always use `src/data/mockData.ts`
+
+> **Note**: Run `npm run seed:supabase` to load mock data into Supabase.
 
 ---
+
 
 ## 📁 Project Structure
 
 ```
 src/
-├── pages/              # Main application pages
-│   ├── Dashboard.tsx   # Home dashboard
-│   ├── PostsPage.tsx   # Browse experiences
-│   ├── PlacesPage.tsx  # Explore places
-│   ├── CompanionsPage.tsx  # Find companions
-│   └── ProfilePage.tsx # User profiles
-├── components/
-│   ├── layout/         # AppLayout, Navbar
-│   ├── ui/             # Shadcn/UI components
-│   ├── EERDiagram.tsx  # Phase 1 visualization
-│   └── home.tsx        # Landing page
-├── lib/
-│   ├── supabase.ts     # Supabase client connection
-│   ├── api.ts          # Database API functions
-│   └── utils.ts        # Utility functions
-├── data/
-│   ├── mockData.ts     # Demo data
-│   └── schema.sql      # PostgreSQL schema
-├── types/
-│   └── database.ts     # TypeScript interfaces
-docs/
-├── EER-DIAGRAM-DOCUMENTATION.md
-├── PHASE-2-LOGICAL-DESIGN.md
-└── PHASE-3-IMPLEMENTATION.md
+|-- App.tsx                     # Main app with routing
+|-- main.tsx                    # Entry point
+|-- index.css                   # Global styles
+|-- pages/                      # Main application pages
+|   |-- Dashboard.tsx           # Home dashboard
+|   |-- PostsPage.tsx           # Browse experiences
+|   |-- PostDetailPage.tsx      # Post details
+|   |-- NewPostPage.tsx         # Create post
+|   |-- PlacesPage.tsx          # Explore places
+|   |-- CompanionsPage.tsx      # Find companions
+|   `-- ProfilePage.tsx         # User profiles
+|-- components/
+|   |-- layout/                 # AppLayout, Navbar
+|   |-- ui/                     # Shadcn/UI components
+|   |-- EERDiagram.tsx          # EER diagram visualization
+|   |-- ERDiagram.tsx           # ER diagram visualization
+|   `-- home.tsx                # Legacy landing page (not routed)
+|-- lib/
+|   |-- supabase.ts             # Supabase client connection
+|   |-- api.ts                  # Data API (Supabase + mock)
+|   `-- utils.ts                # Utility functions
+|-- data/
+|   |-- mockData.ts             # Demo data
+|   `-- schema.sql              # PostgreSQL schema
+|-- types/
+|   |-- database.ts             # TypeScript interfaces
+|   `-- supabase.ts             # Supabase generated types
+scripts/
+|-- dev.mjs                     # Dev helper (sets VITE_DATA_SOURCE)
+`-- seed-supabase.ts            # Seed Supabase with mock data
+public/
+`-- promts/
+    `-- image-prompts.md         # Image generation prompts
 ```
 
 ---
+
 
 ## 🗄️ Database Schema
 
@@ -114,24 +152,35 @@ The complete PostgreSQL schema is in `src/data/schema.sql` and includes:
 | Table                | Description                            |
 | :------------------- | :------------------------------------- |
 | `users`              | User accounts with role specialization |
+| `regular_users`      | Regular user subtype                   |
+| `moderators`         | Moderator subtype                      |
+| `admins`             | Admin subtype                          |
 | `profiles`           | User profile information               |
 | `posts`              | Travel experiences                     |
+| `comments`           | Post comments                          |
+| `ratings`            | Post ratings                           |
+| `follows`            | User follow relationships              |
 | `places`             | Tourist attractions                    |
 | `cities`             | City information                       |
 | `companion_requests` | Travel companion requests              |
 | `companion_matches`  | Match responses                        |
 
+Additional junction tables and views (for images, features, interests, and ratings) live in the schema file.
+
 ---
+
 
 ## 🛠️ Technology Stack
 
 - **Frontend**: React 18 + TypeScript + Vite
 - **Styling**: Tailwind CSS + Shadcn/UI
 - **Routing**: React Router v6
+- **Diagrams**: React Flow
 - **Icons**: Lucide React
-- **Database**: Supabase (PostgreSQL)
+- **Data**: Supabase (PostgreSQL) with mock fallback
 
 ---
+
 
 ## 📚 Documentation
 
